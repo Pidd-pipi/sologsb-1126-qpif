@@ -50,10 +50,40 @@ export interface Campsite {
   access: AccessMode
   /** 该营位默认采用的权重方案 id（v3 迁移时回填） */
   defaultProfileId: number | null
+  /**
+   * 历史别名编号：营位归并后，被吸收营位的旧编号保存在保留项上。
+   * 多值索引（*aliases），后续导入凭旧编号仍能定位到保留项。（v4 迁移时补齐）
+   */
+  aliases: string[]
+  /** 归并留痕：每次归并的来源、时间与冲突取值依据（只增不改） */
+  mergeLogs: CampsiteMergeLog[]
   /** 备注 */
   note: string
   createdAt: string
   updatedAt: string
+}
+
+/** 营位归并留痕：讲清楚另一条记录从哪来、冲突值如何取 */
+export interface CampsiteMergeLog {
+  /** 被吸收营位的原主键（恢复两条原样时可能用到） */
+  absorbedId: number
+  /** 被吸收营位的原编号，已转入 aliases */
+  absorbedCode: string
+  /** 归并时间 ISO */
+  mergedAt: string
+  /** 因子评估转入条数 */
+  factorCount: number
+  /** 风险否决转入条数 */
+  vetoCount: number
+  /** 冲突字段取值说明：每个冲突字段标注最终取自哪一方 */
+  conflicts: Array<{
+    field: string
+    label: string
+    keptValue: string | number
+    source: 'retained' | 'absorbed'
+    retainedValue: string | number
+    absorbedValue: string | number
+  }>
 }
 
 /** 地表类型的可选值，供筛选器与表单复用 */

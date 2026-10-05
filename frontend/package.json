@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview --port 21826"
+    "preview": "vite preview --port 21826",
+    "test:merge": "esbuild scripts/merge.test.ts --bundle --platform=node --format=esm --inject:scripts/_localStorage.ts --outfile=node_modules/.cache/merge.test.mjs && node node_modules/.cache/merge.test.mjs",
+    "test:upgrade": "esbuild scripts/upgrade.test.ts --bundle --platform=node --format=esm --inject:scripts/_localStorage.ts --outfile=node_modules/.cache/upgrade.test.mjs && node node_modules/.cache/upgrade.test.mjs",
+    "test": "npm run test:merge && npm run test:upgrade"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
@@ -19,6 +22,7 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@vitejs/plugin-vue": "^5.2.1",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "~5.7.3",
     "vite": "^6.1.0",
     "vue-tsc": "^2.2.0"

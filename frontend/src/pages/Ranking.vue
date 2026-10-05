@@ -29,7 +29,7 @@ const inputSites = computed(() =>
     if (uiStore.filterAccess && site.access !== uiStore.filterAccess) return false
     const kw = uiStore.keyword.trim()
     if (kw) {
-      const hay = `${site.code} ${site.name} ${site.campName} ${site.note}`
+      const hay = `${site.code} ${(site.aliases ?? []).join(' ')} ${site.name} ${site.campName} ${site.note}`
       if (!hay.includes(kw)) return false
     }
     return true
@@ -95,6 +95,7 @@ function openDetail(siteId: number | undefined): void {
       <div class="page-actions">
         <el-button @click="router.push('/scoring')">调权重</el-button>
         <el-button @click="router.push('/map')">看地图</el-button>
+        <el-button @click="router.push('/merge')">营位归并</el-button>
         <el-button type="primary" @click="router.push('/sites/new')">新增营位</el-button>
       </div>
     </div>
@@ -189,6 +190,9 @@ function openDetail(siteId: number | undefined): void {
               </el-link>
               <span class="site-cell__sub">
                 {{ row.site.campName }} · 海拔 {{ row.site.elevation }} m · 容 {{ row.site.tentCapacity }} 帐
+              </span>
+              <span v-if="row.site.aliases && row.site.aliases.length" class="site-cell__alias">
+                历史别名：{{ row.site.aliases.join('、') }}
               </span>
             </div>
           </template>
@@ -291,6 +295,10 @@ function openDetail(siteId: number | undefined): void {
 .site-cell__sub {
   font-size: 11px;
   color: var(--gb-muted);
+}
+.site-cell__alias {
+  font-size: 11px;
+  color: #92400e;
 }
 .cell-sub {
   font-size: 11px;

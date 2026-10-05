@@ -171,6 +171,8 @@ const previewSite = computed<Campsite>(() => ({
   flatness: Number(site.flatness),
   access: site.access,
   defaultProfileId: profileStore.activeProfile?.id ?? null,
+  aliases: [],
+  mergeLogs: [],
   note: site.note,
   createdAt: '',
   updatedAt: ''
@@ -266,6 +268,8 @@ async function submit(): Promise<void> {
       flatness: Number(site.flatness),
       note: site.note.trim(),
       defaultProfileId: profileStore.activeProfile?.id ?? null,
+      aliases: [],
+      mergeLogs: [],
       createdAt: '',
       updatedAt: ''
     })

@@ -5,6 +5,7 @@
  *   v1 建 sites / factors 两张表
  *   v2 新增 profiles 表，并为 factors 补 siteId 索引
  *   v3 新增 vetos 表，并为存量营位回填默认权重方案
+ *   v4 营位归并：sites 增加 aliases（历史别名编号，多值索引）与 mergeLogs（归并留痕）
  */
 import Dexie, { type Table } from 'dexie'
 import type { Campsite } from '@/types/campsite'
@@ -15,7 +16,7 @@ import type { RiskVeto } from '@/types/veto'
 
 export const DB_NAME = 'gbcampsite-db'
 /** 当前数据结构版本号 */
-export const DB_VERSION = 3
+export const DB_VERSION = 4
 
 export class GbCampsiteDatabase extends Dexie {
   sites!: Table<Campsite, number>
@@ -53,7 +54,7 @@ export class GbCampsiteDatabase extends Dexie {
       })
 
     // v3：新增风险否决表；为存量营位回填默认方案 id 与新增字段缺省值
-    this.version(DB_VERSION)
+    this.version(3)
       .stores({
         sites: '++id, code, name, campName, surface, access, defaultProfileId, updatedAt',
         factors: '++id, siteId, assessedAt, assessor',
@@ -72,6 +73,26 @@ export class GbCampsiteDatabase extends Dexie {
             if (typeof s.note !== 'string') s.note = ''
             if (typeof s.flatness !== 'number') s.flatness = 70
             if (typeof s.tentCapacity !== 'number') s.tentCapacity = 1
+          })
+      })
+
+    // v4：营位归并。aliases 为多值索引（*），后续导入可凭旧编号反查保留项；
+    // 同时为存量营位补齐 aliases / mergeLogs 两个字段，保证旧数据升级后字段完整。
+    this.version(DB_VERSION)
+      .stores({
+        sites:
+          '++id, code, name, campName, surface, access, defaultProfileId, updatedAt, *aliases',
+        factors: '++id, siteId, assessedAt, assessor',
+        profiles: '++id, name, season, active, updatedAt',
+        vetos: '++id, siteId, type, judgedAt'
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('sites')
+          .toCollection()
+          .modify((s: Partial<Campsite>) => {
+            if (!Array.isArray(s.aliases)) s.aliases = []
+            if (!Array.isArray(s.mergeLogs)) s.mergeLogs = []
           })
       })
   }
@@ -138,6 +159,8 @@ function seedProfiles(): ScoreProfile[] {
 function seedSites(): Campsite[] {
   const base = {
     defaultProfileId: 1,
+    aliases: [] as string[],
+    mergeLogs: [] as Campsite['mergeLogs'],
     createdAt: SEED_TS,
     updatedAt: SEED_TS
   }
@@ -244,6 +267,42 @@ function seedSites(): Campsite[] {
       flatness: 95,
       access: '车行',
       note: '河滩沙地，平整度极佳但位于常水位河道边缘，须评估山洪风险。'
+    },
+    /* ---- 以下两条为同一营位的重复登记：坐标相距约 4 m，因子/否决/方案散在两条上 ---- */
+    {
+      ...base,
+      id: 7,
+      code: 'CS-0007',
+      name: '桦树湾平台',
+      campName: '云栖山谷营地',
+      lng: 119.8851,
+      lat: 30.5324,
+      elevation: 418,
+      slope: 3.2,
+      aspect: '东南',
+      surface: '草地',
+      tentCapacity: 5,
+      flatness: 88,
+      access: '车行',
+      note: '一组首登记录：有第一轮因子，未做风险复核。'
+    },
+    {
+      ...base,
+      id: 8,
+      code: 'CS-0008',
+      name: '桦树湾平整台地',
+      campName: '云栖山谷营地',
+      lng: 119.88514,
+      lat: 30.53237,
+      elevation: 415,
+      slope: 2.8,
+      aspect: '南',
+      surface: '草地',
+      tentCapacity: 6,
+      flatness: 90,
+      access: '车行',
+      note: '二组复测记录：补了第二轮因子与山洪沟复核，默认挂雨季方案。',
+      defaultProfileId: 2
     }
   ]
 }
@@ -339,6 +398,38 @@ function seedFactors(): FactorAssessment[] {
       distanceToTrail: 90,
       assessor: '陈巡',
       assessedAt: '2024-04-10'
+    },
+    /* CS-0007：只有一组首登的第一轮因子 */
+    {
+      id: 7,
+      siteId: 7,
+      waterDistance: 95,
+      windDir: '东南',
+      windForce: 2,
+      signalBars: 3,
+      sunHours: 5.1,
+      rockfallRisk: '低',
+      shade: 42,
+      distanceToCar: 60,
+      distanceToTrail: 70,
+      assessor: '李营',
+      assessedAt: '2024-04-07'
+    },
+    /* CS-0008：二组复测的第二轮因子（日期更新），风险结论与首登不同 */
+    {
+      id: 8,
+      siteId: 8,
+      waterDistance: 120,
+      windDir: '南',
+      windForce: 2,
+      signalBars: 4,
+      sunHours: 5.6,
+      rockfallRisk: '中',
+      shade: 38,
+      distanceToCar: 70,
+      distanceToTrail: 65,
+      assessor: '周勘',
+      assessedAt: '2024-04-11'
     }
   ]
   return rows.map((r) => ({ ...r, createdAt: SEED_TS, updatedAt: SEED_TS }))
@@ -362,6 +453,17 @@ function seedVetos(): RiskVeto[] {
       type: '孤树下',
       description: '台地中央有一株孤立高杉，雷雨时存在雷击与断枝风险。',
       judge: '李营',
+      judgedAt: '2024-04-11',
+      createdAt: SEED_TS,
+      updatedAt: SEED_TS
+    },
+    /* CS-0008（复测那条）登记了山洪沟否决，归并后应转入保留项 */
+    {
+      id: 3,
+      siteId: 8,
+      type: '山洪沟',
+      description: '台地南缘紧贴汇水沟口，复测确认短时强降雨时有山洪直冲风险。',
+      judge: '周勘',
       judgedAt: '2024-04-11',
       createdAt: SEED_TS,
       updatedAt: SEED_TS

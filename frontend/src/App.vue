@@ -22,6 +22,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/scoring')) return '/scoring'
   if (path.startsWith('/map')) return '/map'
   if (path.startsWith('/veto')) return '/veto'
+  if (path.startsWith('/merge')) return '/merge'
   return ''
 })
 
@@ -54,6 +55,7 @@ onMounted(async () => {
         <el-menu-item index="/scoring">权重与评分</el-menu-item>
         <el-menu-item index="/map">营位地图</el-menu-item>
         <el-menu-item index="/veto">风险否决</el-menu-item>
+        <el-menu-item index="/merge">营位归并</el-menu-item>
       </el-menu>
       <div class="app-aside">
         <el-tag type="info" effect="plain" size="small">{{ mapModeText }}</el-tag>

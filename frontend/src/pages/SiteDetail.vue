@@ -246,6 +246,7 @@ watch(
       <div class="page-actions">
         <el-button @click="router.push('/')">返回名次表</el-button>
         <el-button @click="router.push('/map')">地图视图</el-button>
+        <el-button @click="router.push('/merge')">营位归并</el-button>
         <el-button type="primary" @click="startEdit">编辑基础信息</el-button>
       </div>
     </div>
@@ -258,6 +259,59 @@ watch(
       title="该营位命中风险否决项，综合等级已被压到 C 级（禁止评 A）"
       :description="vetoList.map((v) => `${v.type}：${v.description}`).join(' ｜ ')"
     />
+
+    <el-alert
+      v-if="site.aliases && site.aliases.length"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="mb12"
+      :title="`历史别名编号：${site.aliases.join('、')}（由营位归并转入，后续导入凭旧编号仍定位到本营位）`"
+    />
+
+    <section v-if="site.mergeLogs && site.mergeLogs.length" class="panel">
+      <div class="panel__head">
+        <h2>归并留痕</h2>
+        <span class="weight-note">本营位共吸收 {{ site.mergeLogs.length }} 条重复登记</span>
+      </div>
+      <el-timeline>
+        <el-timeline-item
+          v-for="log in site.mergeLogs"
+          :key="`${log.absorbedId}-${log.mergedAt}`"
+          :timestamp="formatDateTime(log.mergedAt)"
+          placement="top"
+          type="success"
+        >
+          <div class="merge-log">
+            <p>
+              吸收 <strong>{{ log.absorbedCode }}</strong>（原 id {{ log.absorbedId }}）：转入因子评估
+              {{ log.factorCount }} 轮、风险否决 {{ log.vetoCount }} 条。
+            </p>
+            <el-table v-if="log.conflicts.length" :data="log.conflicts" size="small" border>
+              <el-table-column prop="label" label="冲突字段" width="150" />
+              <el-table-column label="保留项原值" min-width="150">
+                <template #default="{ row }">
+                  <span :class="{ 'conflict-kept': row.source === 'retained' }">{{ row.retainedValue }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column :label="`${log.absorbedCode} 原值`" min-width="150">
+                <template #default="{ row }">
+                  <span :class="{ 'conflict-kept': row.source === 'absorbed' }">{{ row.absorbedValue }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="最终取自" width="110">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="row.source === 'absorbed' ? 'warning' : 'success'">
+                    {{ row.source === 'absorbed' ? '被吸收项' : '保留项' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+            <p v-else class="panel__hint">双方基础字段一致，无冲突取值。</p>
+          </div>
+        </el-timeline-item>
+      </el-timeline>
+    </section>
 
     <MapPanel
       :sites="siteStore.list"
@@ -631,6 +685,16 @@ watch(
 </template>
 
 <style scoped>
+.mb12 {
+  margin-bottom: 12px;
+}
+.conflict-kept {
+  font-weight: 700;
+  color: var(--gb-accent-strong);
+}
+.merge-log p {
+  margin: 0 0 8px;
+}
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
