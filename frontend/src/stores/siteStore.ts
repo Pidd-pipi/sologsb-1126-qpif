@@ -4,6 +4,8 @@ import { defineStore } from 'pinia'
 import { db, toPlain } from '@/utils/db'
 import type { Campsite } from '@/types/campsite'
 import type { FactorAssessment } from '@/types/factor'
+import type { MergeChoice, MergeResult } from '@/types/merge'
+import { executeMerge, resolveSiteId } from '@/utils/merge'
 import { nextSerialNo, nowIso, todayIso } from '@/utils/format'
 
 export const useSiteStore = defineStore('site', () => {
@@ -30,7 +32,7 @@ export const useSiteStore = defineStore('site', () => {
 
   async function createSite(input: Campsite): Promise<number> {
     const now = nowIso()
-    const record = toPlain({ ...input, createdAt: now, updatedAt: now }) as Campsite
+    const record = toPlain({ ...input, aliases: input.aliases ?? [], createdAt: now, updatedAt: now }) as Campsite
     delete record.id
     const id = await db.sites.add(record)
     await load()
@@ -57,8 +59,11 @@ export const useSiteStore = defineStore('site', () => {
 
   async function addFactor(input: FactorAssessment): Promise<number> {
     const now = nowIso()
+    // 若引用的是被并项旧 id，自动重定向到保留项
+    const resolvedSiteId = await resolveSiteId(input.siteId)
     const record = toPlain({
       ...input,
+      siteId: resolvedSiteId ?? input.siteId,
       assessedAt: input.assessedAt || todayIso(),
       createdAt: now,
       updatedAt: now
@@ -72,6 +77,23 @@ export const useSiteStore = defineStore('site', () => {
   async function removeFactor(id: number): Promise<void> {
     await db.factors.delete(id)
     await load()
+  }
+
+  /**
+   * 营位归并：保留项接过被并项的因子与否决，被并项编号成为历史别名。
+   * 事务失败时回滚，两条营位恢复原样，界面可重试。
+   */
+  async function mergeSites(
+    keptSiteId: number,
+    removedSiteId: number,
+    choices: Record<string, MergeChoice>,
+    operator: string
+  ): Promise<MergeResult> {
+    const result = await executeMerge(keptSiteId, removedSiteId, choices, operator)
+    if (result.success) {
+      await load()
+    }
+    return result
   }
 
   function byId(id: number | null | undefined): Campsite | null {
@@ -113,6 +135,7 @@ export const useSiteStore = defineStore('site', () => {
     removeSite,
     addFactor,
     removeFactor,
+    mergeSites,
     byId,
     latestFactor,
     factorsOf

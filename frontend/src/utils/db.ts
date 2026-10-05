@@ -5,6 +5,7 @@
  *   v1 建 sites / factors 两张表
  *   v2 新增 profiles 表，并为 factors 补 siteId 索引
  *   v3 新增 vetos 表，并为存量营位回填默认权重方案
+ *   v4 新增 mergeLogs 表（营位归并记录），为存量营位补 aliases 历史别名字段与编号
  */
 import Dexie, { type Table } from 'dexie'
 import type { Campsite } from '@/types/campsite'
@@ -12,16 +13,18 @@ import type { FactorAssessment } from '@/types/factor'
 import type { ScoreProfile } from '@/types/score'
 import { DEFAULT_WEIGHTS } from '@/types/score'
 import type { RiskVeto } from '@/types/veto'
+import type { SiteMergeRecord } from '@/types/merge'
 
 export const DB_NAME = 'gbcampsite-db'
 /** 当前数据结构版本号 */
-export const DB_VERSION = 3
+export const DB_VERSION = 4
 
 export class GbCampsiteDatabase extends Dexie {
   sites!: Table<Campsite, number>
   factors!: Table<FactorAssessment, number>
   profiles!: Table<ScoreProfile, number>
   vetos!: Table<RiskVeto, number>
+  mergeLogs!: Table<SiteMergeRecord, number>
 
   constructor() {
     super(DB_NAME)
@@ -53,7 +56,7 @@ export class GbCampsiteDatabase extends Dexie {
       })
 
     // v3：新增风险否决表；为存量营位回填默认方案 id 与新增字段缺省值
-    this.version(DB_VERSION)
+    this.version(3)
       .stores({
         sites: '++id, code, name, campName, surface, access, defaultProfileId, updatedAt',
         factors: '++id, siteId, assessedAt, assessor',
@@ -72,6 +75,40 @@ export class GbCampsiteDatabase extends Dexie {
             if (typeof s.note !== 'string') s.note = ''
             if (typeof s.flatness !== 'number') s.flatness = 70
             if (typeof s.tentCapacity !== 'number') s.tentCapacity = 1
+          })
+      })
+
+    // v4：新增 mergeLogs 表（营位归并记录）；为存量营位补 aliases 字段与编号
+    this.version(DB_VERSION)
+      .stores({
+        sites: '++id, code, name, campName, surface, access, defaultProfileId, updatedAt, aliases',
+        factors: '++id, siteId, assessedAt, assessor',
+        profiles: '++id, name, season, active, updatedAt',
+        vetos: '++id, siteId, type, judgedAt',
+        mergeLogs: '++id, keptSiteId, removedSiteId, removedCode, mergedAt'
+      })
+      .upgrade(async (tx) => {
+        // 为存量营位补 aliases 缺省值；编号缺失的按流水号补一个
+        const existingCodes = new Set<string>()
+        await tx
+          .table('sites')
+          .toCollection()
+          .modify((s: Partial<Campsite>) => {
+            if (!Array.isArray(s.aliases)) s.aliases = []
+            const code = (s.code ?? '').trim()
+            if (code) {
+              existingCodes.add(code)
+            } else {
+              // 旧数据没有编号，补一个流水号
+              let n = existingCodes.size + 1
+              let next = `CS-${String(n).padStart(4, '0')}`
+              while (existingCodes.has(next)) {
+                n += 1
+                next = `CS-${String(n).padStart(4, '0')}`
+              }
+              s.code = next
+              existingCodes.add(next)
+            }
           })
       })
   }
@@ -138,6 +175,7 @@ function seedProfiles(): ScoreProfile[] {
 function seedSites(): Campsite[] {
   const base = {
     defaultProfileId: 1,
+    aliases: [],
     createdAt: SEED_TS,
     updatedAt: SEED_TS
   }
@@ -244,6 +282,23 @@ function seedSites(): Campsite[] {
       flatness: 95,
       access: '车行',
       note: '河滩沙地，平整度极佳但位于常水位河道边缘，须评估山洪风险。'
+    },
+    {
+      ...base,
+      id: 7,
+      code: 'CS-0007',
+      name: '溪畔台地 A 区（复测）',
+      campName: '云栖山谷营地',
+      lng: 119.8845,
+      lat: 30.532,
+      elevation: 418,
+      slope: 2.1,
+      aspect: '东南',
+      surface: '草地',
+      tentCapacity: 6,
+      flatness: 90,
+      access: '车行',
+      note: '与 CS-0001 为同一营位的复测记录，坐标与海拔有微小偏差。'
     }
   ]
 }
@@ -339,6 +394,21 @@ function seedFactors(): FactorAssessment[] {
       distanceToTrail: 90,
       assessor: '陈巡',
       assessedAt: '2024-04-10'
+    },
+    {
+      id: 7,
+      siteId: 7,
+      waterDistance: 48,
+      windDir: '东南',
+      windForce: 1,
+      signalBars: 4,
+      sunHours: 5.2,
+      rockfallRisk: '无',
+      shade: 38,
+      distanceToCar: 15,
+      distanceToTrail: 42,
+      assessor: '李营',
+      assessedAt: '2024-04-07'
     }
   ]
   return rows.map((r) => ({ ...r, createdAt: SEED_TS, updatedAt: SEED_TS }))
@@ -363,6 +433,16 @@ function seedVetos(): RiskVeto[] {
       description: '台地中央有一株孤立高杉，雷雨时存在雷击与断枝风险。',
       judge: '李营',
       judgedAt: '2024-04-11',
+      createdAt: SEED_TS,
+      updatedAt: SEED_TS
+    },
+    {
+      id: 3,
+      siteId: 7,
+      type: '陡坡',
+      description: '复测点坡度 2.1°，与 CS-0001 为同一营位，归并后统一处理。',
+      judge: '李营',
+      judgedAt: '2024-04-07',
       createdAt: SEED_TS,
       updatedAt: SEED_TS
     }

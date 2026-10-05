@@ -50,6 +50,11 @@ export interface Campsite {
   access: AccessMode
   /** 该营位默认采用的权重方案 id（v3 迁移时回填） */
   defaultProfileId: number | null
+  /**
+   * 历史别名：归并前被并项的原编号（及曾用名）。
+   * 用于旧编号检索与溯源 —— 搜旧编号能定位到保留项。
+   */
+  aliases: string[]
   /** 备注 */
   note: string
   createdAt: string

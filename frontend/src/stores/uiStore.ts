@@ -9,6 +9,7 @@ import type { RiskVeto } from '@/types/veto'
 import type { FactorWeights, NormalizeMethod, GradeThresholds } from '@/types/score'
 import { DEFAULT_WEIGHTS } from '@/types/score'
 import type { AccessMode, SurfaceType } from '@/types/campsite'
+import { resolveSiteId } from '@/utils/merge'
 import { nowIso, todayIso } from '@/utils/format'
 
 export const useUiStore = defineStore('ui', () => {
@@ -42,8 +43,11 @@ export const useUiStore = defineStore('ui', () => {
 
   async function addVeto(input: RiskVeto): Promise<number> {
     const now = nowIso()
+    // 若引用的是被并项旧 id，自动重定向到保留项
+    const resolvedSiteId = await resolveSiteId(input.siteId)
     const record = toPlain({
       ...input,
+      siteId: resolvedSiteId ?? input.siteId,
       judgedAt: input.judgedAt || todayIso(),
       createdAt: now,
       updatedAt: now

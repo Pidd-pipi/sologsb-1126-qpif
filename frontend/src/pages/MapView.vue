@@ -215,6 +215,12 @@ const gradeStats = computed(() => {
           :vetoed="selectedVetos.length > 0"
         />
       </div>
+      <p v-if="selectedSite.aliases && selectedSite.aliases.length" class="alias-line">
+        历史别名：
+        <el-tag v-for="a in selectedSite.aliases" :key="a" size="small" effect="plain" type="warning" class="mr6">
+          {{ a }}
+        </el-tag>
+      </p>
       <div class="detail-grid">
         <div class="detail-item">
           <span class="detail-item__label">所属营地</span>
@@ -310,5 +316,10 @@ const gradeStats = computed(() => {
 }
 .mr6 {
   margin-right: 6px;
+}
+.alias-line {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--gb-muted);
 }
 </style>

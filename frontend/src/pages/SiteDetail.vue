@@ -242,10 +242,21 @@ watch(
           {{ site.campName }} · {{ site.surface }} · 容 {{ site.tentCapacity }} 帐 ·
           {{ site.access }} · 海拔 {{ site.elevation }} m
         </p>
+        <p v-if="site.aliases && site.aliases.length" class="alias-line">
+          历史别名：<el-tag
+            v-for="a in site.aliases"
+            :key="a"
+            size="small"
+            effect="plain"
+            type="warning"
+            class="mr6"
+          >{{ a }}</el-tag>
+        </p>
       </div>
       <div class="page-actions">
         <el-button @click="router.push('/')">返回名次表</el-button>
         <el-button @click="router.push('/map')">地图视图</el-button>
+        <el-button @click="router.push('/merge')">营位归并</el-button>
         <el-button type="primary" @click="startEdit">编辑基础信息</el-button>
       </div>
     </div>
@@ -643,6 +654,14 @@ watch(
 }
 .coord {
   font-size: 15px;
+}
+.alias-line {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--gb-muted);
+}
+.mr6 {
+  margin-right: 6px;
 }
 .review-form {
   margin-bottom: 12px;

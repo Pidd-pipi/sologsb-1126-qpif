@@ -292,6 +292,9 @@ onBeforeUnmount(() => {
       <span>{{ formatLng(activeSite.lng) }} / {{ formatLat(activeSite.lat) }}</span>
       <span>海拔 {{ activeSite.elevation }} m · 坡度 {{ activeSite.slope }}°</span>
       <span>{{ activeSite.surface }} · 容 {{ activeSite.tentCapacity }} 帐 · {{ activeSite.access }}</span>
+      <span v-if="activeSite.aliases && activeSite.aliases.length" class="map-panel__alias">
+        曾用编号：{{ activeSite.aliases.join('、') }}
+      </span>
     </div>
     <div v-else-if="sites.length" class="map-panel__focus map-panel__focus--idle">
       <span>{{ fallbackLabel }}</span>
@@ -468,6 +471,11 @@ onBeforeUnmount(() => {
 }
 .map-panel__focus--idle {
   color: var(--gb-muted);
+}
+.map-panel__alias {
+  width: 100%;
+  font-size: 11px;
+  color: var(--gb-warn);
 }
 </style>
 

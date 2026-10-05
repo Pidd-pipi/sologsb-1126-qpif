@@ -29,7 +29,8 @@ const inputSites = computed(() =>
     if (uiStore.filterAccess && site.access !== uiStore.filterAccess) return false
     const kw = uiStore.keyword.trim()
     if (kw) {
-      const hay = `${site.code} ${site.name} ${site.campName} ${site.note}`
+      const aliasText = (site.aliases ?? []).join(' ')
+      const hay = `${site.code} ${site.name} ${site.campName} ${site.note} ${aliasText}`
       if (!hay.includes(kw)) return false
     }
     return true
@@ -190,6 +191,9 @@ function openDetail(siteId: number | undefined): void {
               <span class="site-cell__sub">
                 {{ row.site.campName }} · 海拔 {{ row.site.elevation }} m · 容 {{ row.site.tentCapacity }} 帐
               </span>
+              <span v-if="row.site.aliases && row.site.aliases.length" class="site-cell__alias">
+                曾用编号：{{ row.site.aliases.join('、') }}
+              </span>
             </div>
           </template>
         </el-table-column>
@@ -291,6 +295,10 @@ function openDetail(siteId: number | undefined): void {
 .site-cell__sub {
   font-size: 11px;
   color: var(--gb-muted);
+}
+.site-cell__alias {
+  font-size: 11px;
+  color: var(--gb-warn);
 }
 .cell-sub {
   font-size: 11px;
